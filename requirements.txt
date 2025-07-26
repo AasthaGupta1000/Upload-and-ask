@@ -1,9 +1,11 @@
+
 streamlit
 langchain
 langchain-openai
 langchain-community
 langchain-core
 langchain-chroma
+chromadb[chromaui,chromadb-server]
 pypdf2
 openai
 python-dotenv
