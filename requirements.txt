@@ -6,3 +6,4 @@ langchain-core
 openai
 python-dotenv
 tiktoken
+pypdf2
