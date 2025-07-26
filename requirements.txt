@@ -10,3 +10,4 @@ pypdf2
 openai
 python-dotenv
 tiktoken
+sqlite3-binary>=3.35.0
