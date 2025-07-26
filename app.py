@@ -4,7 +4,7 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
-from langchain_chroma import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import OpenAIEmbeddings
 from dotenv import load_dotenv
 import os
@@ -15,15 +15,7 @@ load_dotenv()
 # Initialize model and components
 model = ChatOpenAI(model="gpt-4o-mini")
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-
-# Setup Chroma DB
-persist_dir = "chroma_db"
 embedding_func = OpenAIEmbeddings()
-vector_store = Chroma(
-    collection_name="conversational_faq",
-    embedding_function=embedding_func,
-    persist_directory=persist_dir
-)
 
 # Streamlit UI
 st.set_page_config(page_title="📚 Conversational FAQ Bot")
@@ -32,6 +24,8 @@ st.title("🧠 Upload & Ask")
 # Initialize session state
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+if "vector_store" not in st.session_state:
+    st.session_state.vector_store = None
 
 # Upload file
 uploaded_file = st.file_uploader("Upload a PDF or TXT file", type=["pdf", "txt"])
@@ -50,8 +44,8 @@ if uploaded_file is not None:
     documents = loader.load()
     chunks = text_splitter.split_documents(documents)
 
-    # Add all chunks at once to Chroma
-    vector_store.add_documents(chunks)
+    # Create FAISS vector store from chunks
+    st.session_state.vector_store = FAISS.from_documents(chunks, embedding_func)
     st.success("✅ File uploaded and indexed successfully.")
 
 # Display chat history (above the input)
@@ -63,16 +57,17 @@ for speaker, msg in st.session_state.chat_history:
 user_input = st.chat_input("Type your question...")
 
 if user_input:
-    # Show user message immediately
     with st.chat_message("you"):
         st.markdown(user_input)
     st.session_state.chat_history.append(("You", user_input))
 
-    # Retrieve relevant context
-    results = vector_store.similarity_search(user_input, k=3)
-    context = "\n\n".join([doc.page_content for doc in results]) if results else "No relevant information found."
+    if st.session_state.vector_store is not None:
+        results = st.session_state.vector_store.similarity_search(user_input, k=3)
+        context = "\n\n".join([doc.page_content for doc in results]) if results else "No relevant information found."
+    else:
+        context = "No document uploaded. Please upload a file first."
 
-    # Create prompt with context
+    # Prompt template
     prompt_template = PromptTemplate(
         input_variables=["context", "user_input"],
         template="""
@@ -100,6 +95,9 @@ Give a helpful and concise answer.
     with st.chat_message("ai"):
         st.markdown(ai_response.content)
     st.session_state.chat_history.append(("AI", ai_response.content))
+
 # Clean up temporary files
 if os.path.exists("temp_file.pdf"):
     os.remove("temp_file.pdf")
+if os.path.exists("temp_file.txt"):
+    os.remove("temp_file.txt")
