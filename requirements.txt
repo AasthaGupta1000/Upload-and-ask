@@ -4,6 +4,7 @@ langchain-openai
 langchain-community
 langchain-core
 langchain-faiss
+faiss-cpu
 pypdf
 openai
 python-dotenv
